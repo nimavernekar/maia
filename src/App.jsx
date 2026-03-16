@@ -564,9 +564,10 @@ function Onboarding({onComplete}){
           </button>;})}
         </div>
         {!form.isIrregular?<div>
-          <div style={{textAlign:"center",marginBottom:10}}><div style={{fontSize:56,fontFamily:"'Cormorant Garamond',serif",fontWeight:300,background:`linear-gradient(135deg,#fda4d4,${sc})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",lineHeight:1}}>{form.cycleLen}</div><div style={{fontSize:12,color:"rgba(200,175,255,.4)",marginTop:2}}>days</div></div>
-          <input type="range" min={stage==="pcos"?25:21} max={stage==="pcos"?60:40} value={form.cycleLen} onChange={e=>set("cycleLen",+e.target.value)} style={{width:"100%",accentColor:sc,marginBottom:6,cursor:"pointer"}}/>
-          <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"rgba(200,175,255,.3)"}}><span>{stage==="pcos"?"25":"21"}</span><span>avg</span><span>{stage==="pcos"?"60":"40"}</span></div>
+          <div style={{textAlign:"center",marginBottom:10}}><div style={{fontSize:56,fontFamily:"'Cormorant Garamond',serif",fontWeight:300,background:`linear-gradient(135deg,#fda4d4,${sc})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",lineHeight:1}}>{form.cycleLen}</div><div style={{fontSize:13,color:"rgba(200,175,255,.5)",marginTop:2}}>days average</div></div>
+          <p style={{fontSize:13,color:"rgba(200,175,255,.65)",textAlign:"center",marginBottom:10,lineHeight:1.5}}>Drag the slider below to set your average cycle length — counting from the first day of one period to the first day of the next.</p>
+          <input type="range" min={stage==="pcos"?25:21} max={stage==="pcos"?60:40} value={form.cycleLen} onChange={e=>set("cycleLen",+e.target.value)} style={{width:"100%",accentColor:sc,marginBottom:8,cursor:"pointer",height:6}}/>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"rgba(200,175,255,.5)"}}><span>{stage==="pcos"?"25 days":"21 days"}</span><span style={{color:sc,fontWeight:600}}>↑ drag to set</span><span>{stage==="pcos"?"60 days":"40 days"}</span></div>
         </div>:<div style={{padding:"14px",background:"rgba(255,255,255,.03)",border:"1px solid rgba(200,160,255,.12)",borderRadius:14}}>
           <div style={{fontSize:12,color:"rgba(200,180,255,.6)",marginBottom:10}}>What range does your cycle fall in?</div>
           <div style={{display:"flex",gap:12,alignItems:"center"}}>
@@ -654,7 +655,7 @@ function Onboarding({onComplete}){
   </div>;
 }
 function OHd({t,s}){return <div style={{marginBottom:22}}><h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"clamp(22px,4vw,32px)",fontWeight:300,background:"linear-gradient(135deg,#fda4d4,#c084fc)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",lineHeight:1.2,marginBottom:8}}>{t}</h2>{s&&<p style={{fontSize:14,color:"rgba(200,180,255,.55)",lineHeight:1.6}}>{s}</p>}</div>;}
-function ONv({back,next,ok,label="Continue →"}){return <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10}}><button onClick={back} style={{background:"none",border:"none",color:"rgba(200,175,255,.4)",fontSize:13,fontFamily:G.font,cursor:"pointer",padding:"8px 0"}}>← Back</button><button disabled={!ok} onClick={next} style={bS("#c084fc",!ok)}>{label}</button></div>;}
+function ONv({back,next,ok,label="Continue →"}){return <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:16,gap:12}}><button onClick={back} style={{background:"rgba(255,255,255,.08)",border:"1px solid rgba(200,160,255,.3)",borderRadius:14,color:"rgba(230,210,255,.85)",fontSize:15,fontFamily:G.font,cursor:"pointer",padding:"13px 22px",fontWeight:500,transition:"all .2s"}}>← Back</button><button disabled={!ok} onClick={next} style={bS("#c084fc",!ok)}>{label}</button></div>;}
 
 // ═══════════════════════════════════════════════════════════
 //  DASHBOARD
@@ -668,7 +669,6 @@ function Dashboard({profile,onReset}){
   const stage=profile.lifeStage||"reproductive";
   const sc=stageColor(stage);
   const hasCycle=["reproductive","pcos","endo"].includes(stage);
-  const moon=getMoon();
   const curDay=hasCycle?computeDay(profile):null;
   const phId=hasCycle?getPhase(curDay,profile):null;
   const ph=phId?PHASES[phId]:null;
@@ -682,7 +682,7 @@ function Dashboard({profile,onReset}){
     try{const h=localStorage.getItem(`maia_history_${profile.name}`);if(h)setCycleHistory(JSON.parse(h));}catch{}
   },[profile.name]);
 
-  const TABS=["Today","My Graph","Mood","Nourish","Moon",...(stage==="endo"?["Pain Log"]:[]),...(hasCycle?["Prepare"]:[]),hasCycle?"My Cycle":"Wellness"];
+  const TABS=["Today","My Graph","Mood","Nourish",...(stage==="endo"?["Pain Log"]:[]),...(hasCycle?["Prepare"]:[]),hasCycle?"My Cycle":"Wellness"];
 
   return <div style={{minHeight:"100vh",background:G.bg,fontFamily:G.font,color:"#ede0ff"}}>
     <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap');*{box-sizing:border-box;margin:0;padding:0;}@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}.card-in{animation:fadeUp .35s ease both;}.dtab{transition:all .2s ease;cursor:pointer;white-space:nowrap;}.dtab:hover{opacity:.8;}textarea:focus{outline:none;}textarea::placeholder{color:rgba(200,175,255,.35);} ::-webkit-scrollbar{width:3px;height:3px;} ::-webkit-scrollbar-thumb{background:rgba(200,150,255,.25);border-radius:2px;}`}</style>
@@ -698,7 +698,6 @@ function Dashboard({profile,onReset}){
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           <Chip color={sc} icon={stageInfo?.icon} label={stageInfo?.label}/>
           {ph&&<Chip color={ph.color} icon={ph.icon} label={`${ph.name} · Day ${curDay}`}/>}
-          <Chip color="#818cf8" icon={moon.emoji} label={moon.name}/>
         </div>
       </div>
 
@@ -720,11 +719,8 @@ function Dashboard({profile,onReset}){
             {hasCycle&&ms.slice(0,2).map((m,i)=><div key={i} style={{padding:"9px 14px",background:"rgba(0,0,0,.2)",borderRadius:12,border:`1px solid ${sc}20`,minWidth:130}}><div style={{fontSize:10,color:sc,marginBottom:2,textTransform:"uppercase",letterSpacing:".06em"}}>{m.label}</div><div style={{fontSize:13,color:"#e8d8ff",fontWeight:600}}>{m.date}</div><div style={{fontSize:11,color:"rgba(200,180,255,.4)"}}>{m.daysAway===0?"Today":`in ${m.daysAway} day${m.daysAway!==1?"s":""}`}</div></div>)}
           </div>
         </div>
-        {/* Moon */}
-        <Card color="#818cf8" title={`${moon.emoji} Tonight: ${moon.name}`} sub={`${moon.illum}% illuminated`}>
-          <p style={G.body}>{moon.energy}</p>
-          <ABox color="#818cf8" text={ph?`You're in ${ph.name} phase. ${phId==="menstrual"?"Both you and the moon are releasing. Honour the rest.":phId==="follicular"?"Growing moon mirrors your rising energy — build together.":phId==="ovulation"?"Peak confidence meets the moon. Express, connect, create.":"Inward energy amplified. Emotions are information right now."}`:stage==="peri"?"Waning moon energy supports the releasing and shedding that perimenopause brings.":"The moon's rhythms still touch us even without a cycle. Notice how you feel across the month."}/>
-        </Card>
+        {/* Graph inline on Today for reproductive/pcos/endo */}
+        {hasCycle&&<HGraph profile={profile}/>}
         {/* Symptom tips */}
         {profile.symptoms?.length>0&&<Card color={sc} title="🎯 Your Focus Areas Today" sub={`Personalised for your reported symptoms`}>
           <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
@@ -761,10 +757,10 @@ function Dashboard({profile,onReset}){
         <MoodLogger profile={profile} moodLog={moodLog} setMoodLog={sMoodLog}/>
         {hasCycle&&ph&&<div style={{display:"flex",flexDirection:"column",gap:12}}>
           <div style={{padding:"14px 18px",background:"rgba(255,255,255,.03)",borderRadius:14,border:"1px solid rgba(200,160,255,.1)"}}><p style={{...G.body,fontSize:13}}>Your mood follows your hormones with remarkable consistency. The more you anticipate, the less you'll be blindsided.</p></div>
-          {Object.entries(PHASES).map(([pid,p])=><Card key={pid} color={p.color} title={`${p.icon} ${p.name}`} sub={phaseLabel(profile,pid)}>
+          {[phId,...Object.keys(PHASES).filter(pid=>pid!==phId)].map(pid=>{const p=PHASES[pid];const isCur=pid===phId;return<Card key={pid} color={p.color} title={`${p.icon} ${p.name}${isCur?" · Now":""}`} sub={phaseLabel(profile,pid)}>
             <div style={{display:"flex",flexDirection:"column",gap:10}}>{MOOD_MAPS[pid].map((m,i)=><div key={i} style={{display:"flex",gap:12,alignItems:"flex-start",padding:"10px 12px",background:"rgba(255,255,255,.03)",borderRadius:10}}><span style={{fontSize:20,flexShrink:0}}>{m.icon}</span><div><div style={{fontSize:13,fontWeight:600,color:p.color,marginBottom:3}}>{m.days} — {m.mood}</div><div style={{fontSize:13,color:"rgba(210,190,255,.7)",lineHeight:1.6}}>{m.note}</div></div></div>)}</div>
-            {pid===phId&&<div style={{marginTop:10,padding:"9px 13px",background:`${p.color}15`,borderRadius:10,fontSize:12,color:p.color,fontWeight:600}}>← You are here</div>}
-          </Card>)}
+            {isCur&&<div style={{marginTop:10,padding:"9px 13px",background:`${p.color}15`,borderRadius:10,fontSize:12,color:p.color,fontWeight:600}}>← You are here right now</div>}
+          </Card>;})}
         </div>}
         {!hasCycle&&<Card color={sc} title={`${stageInfo?.icon} ${stageInfo?.label} — Mood Patterns`} sub="What to expect and why">
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -781,7 +777,7 @@ function Dashboard({profile,onReset}){
       {/* TAB 3: NOURISH */}
       {tab===3&&<div style={{display:"flex",flexDirection:"column",gap:14}} className="card-in">
         <div style={{padding:"14px 18px",background:"rgba(255,255,255,.03)",borderRadius:14,border:"1px solid rgba(200,160,255,.1)"}}><p style={{...G.body,fontSize:13}}>Personalised for your <strong style={{color:"#34d399"}}>{DIET_OPTIONS.find(d=>d.id===profile.diet)?.label||"diet"}</strong> and <strong style={{color:sc}}>{stageInfo?.label}</strong>.</p></div>
-        {hasCycle?Object.entries(PHASES).map(([pid,p])=>{const m=getMeals(pid,profile.diet,stage);return<Card key={pid} color={p.color} title={`${p.icon} ${p.name}${pid===phId?" ← now":""}`} sub={`${phaseLabel(profile,pid)} · ${m.focus}`}>
+        {hasCycle?[phId,...Object.keys(PHASES).filter(pid=>pid!==phId)].map(pid=>{const p=PHASES[pid];const isCur=pid===phId;const m=getMeals(pid,profile.diet,stage);return<Card key={pid} color={p.color} title={`${p.icon} ${p.name}${isCur?" · Now":""}`} sub={`${phaseLabel(profile,pid)} · ${m.focus}`}>
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>{[{label:"🌅 Breakfast",...m.breakfast},{label:"☀️ Lunch",...m.lunch},{label:"🌙 Dinner",...m.dinner}].map((meal,i)=><MealCard key={i} meal={meal} color={p.color}/>)}</div>
           <div style={{marginBottom:10}}><div style={{fontSize:11,color:"rgba(200,175,255,.4)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:6}}>Snacks</div><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{m.snacks?.map((s,i)=><span key={i} style={{padding:"4px 10px",background:`${p.color}12`,border:`1px solid ${p.color}25`,borderRadius:20,fontSize:12,color:"rgba(220,200,255,.7)"}}>{s}</span>)}</div></div>
           <div><div style={{fontSize:11,color:"rgba(255,107,138,.5)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:6}}>Avoid</div><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{m.avoid?.map((a,i)=><span key={i} style={{padding:"4px 10px",background:"rgba(255,107,138,.07)",border:"1px solid rgba(255,107,138,.2)",borderRadius:20,fontSize:12,color:"rgba(255,150,170,.65)"}}>{a}</span>)}</div></div>
@@ -793,25 +789,8 @@ function Dashboard({profile,onReset}){
         </Card>}
       </div>}
 
-      {/* TAB 4: MOON */}
-      {tab===4&&<div style={{display:"flex",flexDirection:"column",gap:14}} className="card-in">
-        <div style={{padding:"18px",background:"rgba(129,140,248,.07)",border:"1px solid rgba(129,140,248,.18)",borderRadius:16}}>
-          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:17,color:"#a5b4fc",marginBottom:8,fontStyle:"italic"}}>The moon & your body</div>
-          <p style={{...G.body,fontSize:13}}>Studies show sleep quality shifts measurably around Full Moons. For those in perimenopause and menopause, where sleep disruption is already a major symptom, moon-aware sleep hygiene is particularly worth practicing.</p>
-        </div>
-        <Card color="#818cf8" title={`${moon.emoji} Tonight: ${moon.name}`} sub={`${moon.illum}% illuminated`}>
-          <p style={G.body}>{moon.energy}</p>
-          <ABox color="#818cf8" text={ph?`You're in ${ph.name} phase. ${phId==="menstrual"?"Both releasing. Rare alignment — honour the rest.":phId==="follicular"?"Growing moon mirrors your rising energy.":phId==="ovulation"?"Peak confidence + growing moon. Express everything.":"Inward energy amplified. Emotions are information."}`:stage==="peri"?"Waning moon energy supports the releasing that perimenopause invites.":"The moon's rhythm still touches you. Notice your energy across the month — many women find their own lunar pattern even post-menopause."}/>
-        </Card>
-        {hasCycle&&<Card color="#c084fc" title="🔄 Moon × Your Cycle" sub="This month">
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {Object.entries(PHASES).map(([pid,p])=><div key={pid} style={{display:"flex",gap:10,padding:"10px 14px",background:"rgba(255,255,255,.03)",borderRadius:10}}><div style={{width:3,borderRadius:2,background:p.color,flexShrink:0,alignSelf:"stretch",minHeight:40}}/><div><div style={{fontSize:11,color:"rgba(200,175,255,.4)",marginBottom:2}}>{phaseLabel(profile,pid)}</div><div style={{fontSize:13,color:"#e0d0ff",marginBottom:1}}>{p.icon} {p.name}</div><div style={{fontSize:12,color:"rgba(200,180,255,.55)",fontStyle:"italic"}}>{pid==="menstrual"?"Rest, release — mirrors waning moon energy":pid==="follicular"?"Fresh start — mirrors new and waxing moon":pid==="ovulation"?"Peak — mirrors full moon magnetism":"Inward — full to waning moon deepens this"}</div></div></div>)}
-          </div>
-        </Card>}
-      </div>}
-
-      {/* TAB 5: PAIN LOG (endo only) */}
-      {tab===5&&stage==="endo"&&<div style={{display:"flex",flexDirection:"column",gap:14}} className="card-in">
+      {/* TAB 4: PAIN LOG (endo only) */}
+      {tab===4&&stage==="endo"&&<div style={{display:"flex",flexDirection:"column",gap:14}} className="card-in">
         <PainLogger profile={profile} painLog={painLog} setPainLog={sPainLog}/>
       </div>}
 
