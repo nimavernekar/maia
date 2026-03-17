@@ -1,7 +1,16 @@
 import { useState, useEffect } from "react";
-// v2.1 - supabase integration
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
          ReferenceLine, CartesianGrid, ComposedChart, Area } from "recharts";
+import { supabase, getAnonId } from "./supabase.js";
+
+// ── PostHog analytics ─────────────────────────────────────
+function track(event, props = {}) {
+  try {
+    if (window.posthog) {
+      window.posthog.capture(event, { anon_id: getAnonId(), ...props });
+    }
+  } catch {}
+}
 
 // ═══════════════════════════════════════════════════════════
 //  LIFE STAGES
@@ -843,11 +852,37 @@ function Dashboard({profile,onReset}){
 // ═══════════════════════════════════════════════════════════
 //  ROOT
 // ═══════════════════════════════════════════════════════════
-const SK="maia_v2_profile";
-export default function App(){
-  const [profile,sProfile]=useState(null),[loading,sLoading]=useState(true);
-  useEffect(()=>{try{const s=localStorage.getItem(SK);if(s)sProfile(JSON.parse(s));}catch{} sLoading(false);},[]);
-  const done=(f)=>{try{localStorage.setItem(SK,JSON.stringify(f));}catch{} sProfile(f);};
+const SK = "maia_v2_profile";
+export default function App() {
+  const [profile, sProfile] = useState(null);
+  const [loading, sLoading] = useState(true);
+
+  useEffect(() => {
+    try { const s = localStorage.getItem(SK); if (s) sProfile(JSON.parse(s)); } catch {}
+    sLoading(false);
+  }, []);
+
+  const done = async (f) => {
+    try { localStorage.setItem(SK, JSON.stringify(f)); } catch {}
+    sProfile(f);
+    // Save to Supabase
+    try {
+      await supabase.from("profiles").upsert({
+        anon_id:      getAnonId(),
+        name:         f.name,
+        life_stage:   f.lifeStage,
+        cycle_len:    f.cycleLen,
+        period_len:   f.periodLen,
+        is_irregular: f.isIrregular,
+        symptoms:     f.symptoms,
+        diet:         f.diet,
+        focus:        f.focus,
+        cycle_date:   f.cycleDate,
+        created_at:   new Date().toISOString(),
+      }, { onConflict: "anon_id" });
+      track("onboarding_complete", { life_stage: f.lifeStage, diet: f.diet });
+    } catch(err) { console.warn("Supabase error:", err); }
+  };    
   const reset=()=>{try{localStorage.removeItem(SK);}catch{} sProfile(null);};
   if(loading) return <div style={{minHeight:"100vh",background:"#08040f",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{fontSize:32}}>🌸</div></div>;
   return profile?<Dashboard profile={profile} onReset={reset}/>:<Onboarding onComplete={done}/>;
