@@ -3,7 +3,8 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
          ReferenceLine, CartesianGrid, ComposedChart, Area } from "recharts";
 import { supabase, getAnonId } from "./supabase.js";
 
-// ── PostHog analytics ─────────────────────────────────────
+// ── PostHog analytics (feature usage tracking) ─────────────
+// Fires whenever window.posthog is available (loaded async in main.jsx)
 function track(event, props = {}) {
   try {
     if (window.posthog) {
@@ -312,7 +313,27 @@ function MealCard({meal,color}){
 const MOOD_LABELS=["😞 Very low","😔 Low","😐 Okay","🙂 Good","✨ Great"];
 function MoodLogger({profile,moodLog,setMoodLog}){
   const key=todayKey(),today=moodLog[key]||{score:null,note:""};
-  const save=(updates)=>{const nl={...moodLog,[key]:{...today,...updates}};setMoodLog(nl);try{localStorage.setItem(`maia_mood_${profile.name}`,JSON.stringify(nl));}catch{}};
+  const save=(updates)=>{
+    const nl={...moodLog,[key]:{...today,...updates}};
+    setMoodLog(nl);
+    // Save to localStorage
+    try{localStorage.setItem(`maia_mood_${profile.name}`,JSON.stringify(nl));}catch{}
+    // Save to Supabase in background
+    const entry={...today,...updates};
+    if(entry.score){
+      try{
+        supabase.from("mood_logs").upsert({
+          anon_id:   getAnonId(),
+          log_date:  key,
+          score:     entry.score,
+          note:      entry.note||"",
+          phase:     null, // could add phId here if passed as prop
+          life_stage: profile.lifeStage||"reproductive",
+        },{onConflict:"anon_id,log_date"});
+        track("mood_logged",{score:entry.score,life_stage:profile.lifeStage});
+      }catch{}
+    }
+  };
   const entries=Object.entries(moodLog).sort((a,b)=>new Date(b[0])-new Date(a[0]));
   const avg=entries.length?Math.round(entries.slice(0,7).reduce((s,[,v])=>s+(v.score||0),0)/Math.min(7,entries.length)*10)/10:null;
   const sc=stageColor(profile.lifeStage||"reproductive");
@@ -668,6 +689,146 @@ function OHd({t,s}){return <div style={{marginBottom:22}}><h2 style={{fontFamily
 function ONv({back,next,ok,label="Continue →"}){return <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:16,gap:12}}><button onClick={back} style={{background:"rgba(255,255,255,.08)",border:"1px solid rgba(200,160,255,.3)",borderRadius:14,color:"rgba(230,210,255,.85)",fontSize:15,fontFamily:G.font,cursor:"pointer",padding:"13px 22px",fontWeight:500,transition:"all .2s"}}>← Back</button><button disabled={!ok} onClick={next} style={bS("#c084fc",!ok)}>{label}</button></div>;}
 
 // ═══════════════════════════════════════════════════════════
+//  LEARN TAB — curated articles from trusted sources
+// ═══════════════════════════════════════════════════════════
+
+const ARTICLES = [
+  // Hormones & the cycle
+  { id:"h1", topic:"hormones", title:"Periods & the Menstrual Cycle", source:"NHS", sourceColor:"#0072ce", url:"https://www.nhs.uk/conditions/periods/fertility-in-the-menstrual-cycle/", summary:"How oestrogen, progesterone, LH and FSH rise and fall through your cycle — the official NHS guide.", tags:["reproductive","pcos","endo"], readTime:"5 min", icon:"🧬" },
+  { id:"h2", topic:"hormones", title:"Menstrual Cycle: Overview & Phases", source:"Cleveland Clinic", sourceColor:"#0074b8", url:"https://my.clevelandclinic.org/health/articles/10132-menstrual-cycle", summary:"A clear breakdown of all four cycle phases with hormone levels, what's normal, and when to see a doctor.", tags:["reproductive","pcos","endo"], readTime:"7 min", icon:"🔬" },
+  { id:"h3", topic:"hormones", title:"The Role of Hormones in Your Cycle", source:"West Suburban Medical", sourceColor:"#c084fc", url:"https://www.westsuburbanmc.com/the-role-of-hormones-in-the-menstrual-cycle/", summary:"Plain-English explanation of estrogen, progesterone, LH, FSH and testosterone — what each does and what happens when they're off.", tags:["reproductive","pcos","endo","peri","meno"], readTime:"6 min", icon:"⚗️" },
+  // PCOS
+  { id:"p1", topic:"pcos", title:"Polycystic Ovary Syndrome (PCOS)", source:"NHS", sourceColor:"#0072ce", url:"https://www.nhs.uk/conditions/polycystic-ovary-syndrome-pcos/", summary:"The official NHS guide to PCOS — causes, symptoms, diagnosis and treatment options including lifestyle changes.", tags:["pcos"], readTime:"6 min", icon:"〰" },
+  { id:"p2", topic:"pcos", title:"PCOS: Symptoms & Treatment", source:"Cleveland Clinic", sourceColor:"#0074b8", url:"https://my.clevelandclinic.org/health/diseases/8316-polycystic-ovary-syndrome-pcos", summary:"Comprehensive PCOS guide covering androgens, insulin resistance, fertility, and what treatment looks like depending on your goals.", tags:["pcos"], readTime:"8 min", icon:"🔭" },
+  { id:"p3", topic:"pcos", title:"PCOS — Johns Hopkins Medicine", source:"Johns Hopkins", sourceColor:"#002d72", url:"https://www.hopkinsmedicine.org/health/conditions-and-diseases/polycystic-ovary-syndrome-pcos", summary:"Trusted academic hospital guide with detailed information on diagnosis, ultrasound, blood tests, and management strategies.", tags:["pcos"], readTime:"7 min", icon:"🏥" },
+  // Perimenopause & Menopause
+  { id:"m1", topic:"menopause", title:"Menopause — Symptoms", source:"NHS", sourceColor:"#0072ce", url:"https://www.nhs.uk/conditions/menopause/symptoms/", summary:"Full list of menopause and perimenopause symptoms — physical and mental health — from the NHS.", tags:["peri","meno"], readTime:"5 min", icon:"🌊" },
+  { id:"m2", topic:"menopause", title:"Menopause — Treatments", source:"NHS", sourceColor:"#0072ce", url:"https://www.nhs.uk/conditions/menopause/treatment/", summary:"Everything you need to know about HRT — types, safety, risks, and alternatives. Direct from the NHS.", tags:["peri","meno"], readTime:"8 min", icon:"💊" },
+  { id:"m3", topic:"menopause", title:"Perimenopause & Menopause — Overview", source:"NHS", sourceColor:"#0072ce", url:"https://www.nhs.uk/conditions/menopause/", summary:"What perimenopause is, when it starts, and how it differs from menopause. A clear starting point.", tags:["peri","meno"], readTime:"4 min", icon:"🌙" },
+  { id:"m4", topic:"menopause", title:"Things You Can Do for Menopause", source:"NHS", sourceColor:"#0072ce", url:"https://www.nhs.uk/conditions/menopause/things-you-can-do/", summary:"Practical self-care advice: CBT, vaginal moisturisers, sleep tips, stress management — evidence-based and actionable.", tags:["peri","meno"], readTime:"5 min", icon:"🌿" },
+  // Nutrition & cycle syncing
+  { id:"n1", topic:"nutrition", title:"Nutrition & Exercise Through Your Cycle", source:"Cleveland Clinic", sourceColor:"#0074b8", url:"https://health.clevelandclinic.org/nutrition-and-exercise-throughout-your-menstrual-cycle", summary:"Cycle syncing explained by Cleveland Clinic — what to eat and how to move in each phase, with the science behind it.", tags:["reproductive","pcos","endo"], readTime:"7 min", icon:"🥗" },
+  { id:"n2", topic:"nutrition", title:"Foods for Each Stage of Your Cycle", source:"London Clinic of Nutrition", sourceColor:"#34d399", url:"https://londonclinicofnutrition.co.uk/nutrition-articles/foods-to-eat-for-each-stage-of-your-menstrual-cycle/", summary:"Functional nutrition guide to eating for each phase — what supports oestrogen, what helps clear it, and what fights PMS.", tags:["reproductive","pcos","endo"], readTime:"6 min", icon:"🍃" },
+  // Mental health
+  { id:"mh1", topic:"mental", title:"PMS — Symptoms & Causes", source:"Mayo Clinic", sourceColor:"#c5392a", url:"https://www.mayoclinic.org/diseases-conditions/premenstrual-syndrome/symptoms-causes/syc-20376780", summary:"Mayo Clinic's deep dive into PMS and PMDD — the serotonin connection, hormonal triggers, and when to seek help.", tags:["reproductive","pcos","endo","peri"], readTime:"6 min", icon:"🧠" },
+  { id:"mh2", topic:"mental", title:"Understanding PMDD", source:"Mayo Clinic Press", sourceColor:"#c5392a", url:"https://mcpress.mayoclinic.org/women-health/understanding-pmdd-and-how-symptoms-change-as-you-get-older/", summary:"PMDD from teens to perimenopause — how it changes, what worsens it, and evolving treatment options through life stages.", tags:["reproductive","pcos","peri"], readTime:"7 min", icon:"💫" },
+  { id:"mh3", topic:"mental", title:"Periods & Mental Health", source:"Talkspace", sourceColor:"#818cf8", url:"https://www.talkspace.com/blog/periods-pmdd-mental-health/", summary:"The connection between menstrual hormones, serotonin, depression and anxiety — why your cycle affects your mental health.", tags:["reproductive","pcos","endo","peri"], readTime:"5 min", icon:"🌸" },
+];
+
+const TOPIC_LABELS = {
+  hormones:  { label:"Hormones & Cycle",         icon:"🧬", color:"#c084fc" },
+  pcos:      { label:"PCOS",                      icon:"〰",  color:"#f472b6" },
+  menopause: { label:"Perimenopause & Menopause", icon:"🌊", color:"#38bdf8" },
+  nutrition: { label:"Nutrition & Cycle Syncing", icon:"🥗", color:"#34d399" },
+  mental:    { label:"Mental Health & Hormones",  icon:"🧠", color:"#fbbf24" },
+};
+
+function LearnTab({ profile, lifeStage }) {
+  const [activeTopic, setActiveTopic] = useState("all");
+  const [search, setSearch] = useState("");
+  const sc = stageColor(lifeStage || "reproductive");
+
+  // Articles relevant to this user's life stage
+  const stageRelevant = ARTICLES.filter(a => a.tags.includes(lifeStage));
+
+  const filtered = ARTICLES.filter(a => {
+    const matchTopic = activeTopic === "all" || a.topic === activeTopic;
+    const matchSearch = !search || a.title.toLowerCase().includes(search.toLowerCase()) || a.summary.toLowerCase().includes(search.toLowerCase());
+    return matchTopic && matchSearch;
+  });
+
+  // Sort: relevant to user's stage first
+  const sorted = [...filtered].sort((a, b) => {
+    const aRel = a.tags.includes(lifeStage) ? 0 : 1;
+    const bRel = b.tags.includes(lifeStage) ? 0 : 1;
+    return aRel - bRel;
+  });
+
+  const handleArticleClick = (article) => {
+    track("article_opened", { article_id: article.id, topic: article.topic, source: article.source, life_stage: lifeStage });
+    window.open(article.url, "_blank", "noopener,noreferrer");
+  };
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:14 }} className="card-in">
+      {/* Header */}
+      <div style={{ padding:"18px 20px", background:`linear-gradient(135deg,${sc}12,rgba(255,255,255,.02))`, border:`1px solid ${sc}25`, borderRadius:18 }}>
+        <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:22, fontWeight:300, color:"#f0e0ff", marginBottom:6 }}>📖 Learn</div>
+        <p style={{ fontSize:13, color:"rgba(200,180,255,.6)", lineHeight:1.7 }}>
+          Curated articles from NHS, Mayo Clinic, Cleveland Clinic and more. Articles relevant to your <strong style={{ color:sc }}>{LIFE_STAGES.find(s=>s.id===lifeStage)?.label}</strong> profile are shown first.
+        </p>
+        {/* Search */}
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search articles..."
+          style={{ ...iS, marginTop:12, fontSize:13, padding:"11px 16px" }}
+        />
+      </div>
+
+      {/* Topic filters */}
+      <div style={{ display:"flex", gap:7, flexWrap:"wrap" }}>
+        <button onClick={() => setActiveTopic("all")} style={{ padding:"7px 14px", borderRadius:20, background:activeTopic==="all"?`${sc}22`:"rgba(255,255,255,.04)", border:`1px solid ${activeTopic==="all"?sc+"55":"rgba(200,160,255,.12)"}`, fontSize:12, color:activeTopic==="all"?sc:"rgba(200,175,255,.45)", fontFamily:G.font, cursor:"pointer" }}>
+          All topics
+        </button>
+        {Object.entries(TOPIC_LABELS).map(([key, t]) => (
+          <button key={key} onClick={() => setActiveTopic(key)} style={{ padding:"7px 14px", borderRadius:20, background:activeTopic===key?`${t.color}22`:"rgba(255,255,255,.04)", border:`1px solid ${activeTopic===key?t.color+"55":"rgba(200,160,255,.12)"}`, fontSize:12, color:activeTopic===key?t.color:"rgba(200,175,255,.45)", fontFamily:G.font, cursor:"pointer", display:"flex", alignItems:"center", gap:5 }}>
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Article count */}
+      <div style={{ fontSize:12, color:"rgba(200,175,255,.4)" }}>
+        {sorted.length} article{sorted.length!==1?"s":""} {activeTopic!=="all"?`in ${TOPIC_LABELS[activeTopic]?.label}`:"across all topics"}
+        {lifeStage && activeTopic==="all" && <span style={{ color:sc }}> · {stageRelevant.length} matched to your profile</span>}
+      </div>
+
+      {/* Article cards */}
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        {sorted.map(article => {
+          const isRelevant = article.tags.includes(lifeStage);
+          const topic = TOPIC_LABELS[article.topic];
+          return (
+            <button
+              key={article.id}
+              onClick={() => handleArticleClick(article)}
+              style={{ width:"100%", textAlign:"left", background:"rgba(255,255,255,.028)", border:`1px solid ${isRelevant ? sc+"35" : "rgba(200,160,255,.15)"}`, borderLeft:`3px solid ${isRelevant ? sc : "rgba(200,160,255,.2)"}`, borderRadius:14, padding:"16px 18px", cursor:"pointer", fontFamily:G.font, transition:"all .2s" }}
+            >
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10, marginBottom:8 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <span style={{ fontSize:20 }}>{article.icon}</span>
+                  <div>
+                    <div style={{ fontSize:14, fontWeight:600, color:"#f0e0ff", lineHeight:1.3 }}>{article.title}</div>
+                    <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:4 }}>
+                      <span style={{ fontSize:11, color:article.sourceColor, fontWeight:600, padding:"2px 8px", background:`${article.sourceColor}15`, borderRadius:10, border:`1px solid ${article.sourceColor}30` }}>{article.source}</span>
+                      <span style={{ fontSize:11, color:"rgba(200,175,255,.4)" }}>{article.readTime} read</span>
+                      <span style={{ fontSize:11, color:topic?.color, padding:"2px 8px", background:`${topic?.color}12`, borderRadius:10 }}>{topic?.icon} {topic?.label}</span>
+                    </div>
+                  </div>
+                </div>
+                <span style={{ fontSize:16, color:"rgba(200,175,255,.4)", flexShrink:0, marginTop:2 }}>↗</span>
+              </div>
+              <p style={{ fontSize:13, color:"rgba(200,180,255,.65)", lineHeight:1.6, margin:0 }}>{article.summary}</p>
+              {isRelevant && (
+                <div style={{ marginTop:8, display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", background:`${sc}15`, borderRadius:10, fontSize:11, color:sc }}>
+                  ✦ Relevant to your {LIFE_STAGES.find(s=>s.id===lifeStage)?.label} profile
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Disclaimer */}
+      <div style={{ padding:"14px 18px", background:"rgba(255,255,255,.03)", borderRadius:14, border:"1px solid rgba(200,160,255,.1)", fontSize:12, color:"rgba(200,175,255,.45)", lineHeight:1.7 }}>
+        ℹ️ All articles link to trusted external sources — NHS, Mayo Clinic, Cleveland Clinic, and Johns Hopkins. Maia does not host or modify this content. Nothing on Maia replaces medical advice from your doctor.
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
 //  DASHBOARD
 // ═══════════════════════════════════════════════════════════
 function Dashboard({profile,onReset}){
@@ -686,13 +847,20 @@ function Dashboard({profile,onReset}){
   const ms=hasCycle?getMilestones(profile):[];
   const stageInfo=LIFE_STAGES.find(s=>s.id===stage);
 
+  // Track tab name for analytics
+  const TABS=["Today","My Graph","Mood","Nourish",...(stage==="endo"?["Pain Log"]:[]),...(hasCycle?["Prepare"]:[]),hasCycle?"My Cycle":"Wellness","Learn 📖"];
+  const switchTab = (i) => {
+    sTab(i);
+    track("tab_viewed", { tab: TABS[i], life_stage: stage, cycle_day: curDay, phase: phId });
+  };
+
   useEffect(()=>{
+    // Track first dashboard view
+    track("dashboard_opened", { life_stage: stage, phase: phId, cycle_day: curDay });
     try{const m=localStorage.getItem(`maia_mood_${profile.name}`);if(m)sMoodLog(JSON.parse(m));}catch{}
     try{const p=localStorage.getItem(`maia_pain_${profile.name}`);if(p)sPainLog(JSON.parse(p));}catch{}
     try{const h=localStorage.getItem(`maia_history_${profile.name}`);if(h)setCycleHistory(JSON.parse(h));}catch{}
   },[profile.name]);
-
-  const TABS=["Today","My Graph","Mood","Nourish",...(stage==="endo"?["Pain Log"]:[]),...(hasCycle?["Prepare"]:[]),hasCycle?"My Cycle":"Wellness"];
 
   return <div style={{minHeight:"100vh",background:G.bg,fontFamily:G.font,color:"#ede0ff"}}>
     <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap');*{box-sizing:border-box;margin:0;padding:0;}@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}.card-in{animation:fadeUp .35s ease both;}.dtab{transition:all .2s ease;cursor:pointer;white-space:nowrap;}.dtab:hover{opacity:.8;}textarea:focus{outline:none;}textarea::placeholder{color:rgba(200,175,255,.35);} ::-webkit-scrollbar{width:3px;height:3px;} ::-webkit-scrollbar-thumb{background:rgba(200,150,255,.25);border-radius:2px;}`}</style>
@@ -713,7 +881,7 @@ function Dashboard({profile,onReset}){
 
       {/* Tabs */}
       <div style={{display:"flex",gap:6,overflowX:"auto",marginBottom:22,paddingBottom:4}}>
-        {TABS.map((t,i)=><button key={i} className="dtab" onClick={()=>sTab(i)} style={{background:tab===i?`${sc}22`:"rgba(255,255,255,.04)",border:`1px solid ${tab===i?sc+"55":"rgba(200,160,255,.12)"}`,borderRadius:20,padding:"8px 16px",fontSize:13,color:tab===i?sc:"rgba(200,175,255,.45)",fontFamily:G.font}}>{t}</button>)}
+        {TABS.map((t,i)=><button key={i} className="dtab" onClick={()=>switchTab(i)} style={{background:tab===i?`${sc}22`:"rgba(255,255,255,.04)",border:`1px solid ${tab===i?sc+"55":"rgba(200,160,255,.12)"}`,borderRadius:20,padding:"8px 16px",fontSize:13,color:tab===i?sc:"rgba(200,175,255,.45)",fontFamily:G.font}}>{t}</button>)}
       </div>
 
       {/* TAB 0: TODAY */}
@@ -845,6 +1013,10 @@ function Dashboard({profile,onReset}){
           <button onClick={onReset} style={{marginTop:12,...bS("#ff6b8a"),fontSize:13,padding:"10px 20px"}}>Start fresh</button>
         </div>
       </div>}
+
+      {/* LEARN TAB */}
+      {tab===TABS.length-1&&<LearnTab profile={profile} lifeStage={stage}/>}
+
     </div>
   </div>;
 }
@@ -853,37 +1025,67 @@ function Dashboard({profile,onReset}){
 //  ROOT
 // ═══════════════════════════════════════════════════════════
 const SK = "maia_v2_profile";
+
 export default function App() {
   const [profile, sProfile] = useState(null);
   const [loading, sLoading] = useState(true);
 
   useEffect(() => {
+    // Load from localStorage first (instant)
     try { const s = localStorage.getItem(SK); if (s) sProfile(JSON.parse(s)); } catch {}
     sLoading(false);
   }, []);
 
   const done = async (f) => {
+    // Save to localStorage immediately (fast)
     try { localStorage.setItem(SK, JSON.stringify(f)); } catch {}
     sProfile(f);
-    // Save to Supabase
+
+    // Save to Supabase in background (persistent, you can see it)
     try {
+      const anonId = getAnonId();
       await supabase.from("profiles").upsert({
-        anon_id:      getAnonId(),
-        name:         f.name,
-        life_stage:   f.lifeStage,
-        cycle_len:    f.cycleLen,
-        period_len:   f.periodLen,
-        is_irregular: f.isIrregular,
-        symptoms:     f.symptoms,
-        diet:         f.diet,
-        focus:        f.focus,
-        cycle_date:   f.cycleDate,
-        created_at:   new Date().toISOString(),
+        anon_id:     anonId,
+        name:        f.name,
+        life_stage:  f.lifeStage,
+        cycle_len:   f.cycleLen,
+        period_len:  f.periodLen,
+        is_irregular:f.isIrregular,
+        short_cycle: f.shortCycle,
+        long_cycle:  f.longCycle,
+        symptoms:    f.symptoms,
+        diet:        f.diet,
+        focus:       f.focus,
+        cycle_date:  f.cycleDate,
+        created_at:  new Date().toISOString(),
       }, { onConflict: "anon_id" });
-      track("onboarding_complete", { life_stage: f.lifeStage, diet: f.diet });
-    } catch(err) { console.warn("Supabase error:", err); }
-  };    
-  const reset=()=>{try{localStorage.removeItem(SK);}catch{} sProfile(null);};
-  if(loading) return <div style={{minHeight:"100vh",background:"#08040f",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{fontSize:32}}>🌸</div></div>;
-  return profile?<Dashboard profile={profile} onReset={reset}/>:<Onboarding onComplete={done}/>;
+
+      track("onboarding_complete", {
+        life_stage: f.lifeStage,
+        diet:       f.diet,
+        focus:      f.focus,
+        symptom_count: f.symptoms?.length,
+        is_irregular: f.isIrregular,
+      });
+    } catch (err) {
+      console.warn("Supabase save failed (non-critical):", err);
+    }
+  };
+
+  const reset = () => {
+    try { localStorage.removeItem(SK); } catch {}
+    sProfile(null);
+    track("profile_reset");
+  };
+
+  if (loading) return (
+    <div style={{ minHeight: "100vh", background: "#08040f", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ fontSize: 32 }}>🌸</div>
+    </div>
+  );
+
+  return profile
+    ? <Dashboard profile={profile} onReset={reset} />
+    : <Onboarding onComplete={done} />;
 }
+
