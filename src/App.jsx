@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useState, useEffect } from "react";
 // v2.1 - supabase integration
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
          ReferenceLine, CartesianGrid, ComposedChart, Area } from "recharts";
